@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #
 # This is the entry point for the playbook bundle. It has a hard dependency on Python. It will try
 # to look for an already existing installation of Ansible, and will try to install it if not found.
@@ -8,14 +8,20 @@
 main() {
 	# You must call this using BASEDIR so it can locate the right path where the temp bundle was
 	# extracted. If you don't, it will use the current working dir (cwd).
-	export BASEDIR=${BASEDIR:-.}
+	export BASEDIR="${BASEDIR:-.}"
 
 	# Ensure we have HOME defined, otherwise set it manually
-	test -z "$HOME" && export HOME; HOME="$(getent passwd "$(id -un)" | cut -d: -f6)"
+	if [[ "$(uname)" == 'Darwin' ]]; then
+		test -z "$HOME" && export HOME; HOME=$(dscl . -read "/Users/$(id -un)" NFSHomeDirectory | awk -F': ' '{print $2}')
+	else
+		test -z "$HOME" && export HOME; HOME=$(getent passwd "$(id -un)" | cut -d: -f6)
+	fi
 
-	export PIP_ROOT_PATH; PIP_ROOT_PATH="$(realpath "${BASEDIR}/python-deps")"
-	export PATH="${PIP_ROOT_PATH}/usr/bin:${PIP_ROOT_PATH}${HOME}/.local/bin:${PATH}"
+	export PIP_ROOT_PATH; PIP_ROOT_PATH="${BASEDIR}/python-deps"
+	SHORT_VERSION=$(python --version | awk '{print $2}' | awk -F . '{print $1"."$2}')
+	MACOS_PIP_BIN=${PIP_ROOT_PATH}${HOME}/Library/Python/$SHORT_VERSION/bin
 
+	export PATH="${PIP_ROOT_PATH}/usr/bin:${PIP_ROOT_PATH}${HOME}/.local/bin:$MACOS_PIP_BIN:${PATH}"
 	ensure_python_is_installed
 	install_ansible
 
